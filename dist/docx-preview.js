@@ -2914,6 +2914,9 @@
             this.endnoteMap = {};
             this.currentEndnoteIds = [];
             this.usedHederFooterParts = [];
+            this.currentPageNumber = 0;
+            this.totalPages = 0;
+            this.fieldStack = [];
             this.currentTabs = [];
             this.commentMap = {};
             this.tasks = [];
@@ -3127,8 +3130,11 @@
             const sections = this.splitBySection(document.children, document.props);
             const pages = this.groupByPageBreaks(sections);
             let prevProps = null;
+            this.totalPages = pages.length;
             for (let i = 0, l = pages.length; i < l; i++) {
                 this.currentFootnoteIds = [];
+                this.currentPageNumber = i + 1;
+                this.fieldStack = [];
                 const section = pages[i][0];
                 let props = section.sectProps;
                 const pageElement = this.createPageElement(this.className, props, document.cssStyle);
@@ -3404,6 +3410,8 @@ section.${c}>footer { z-index: 1; }
                     return null;
                 case DomType.Run:
                     return this.renderRun(elem);
+                case DomType.SimpleField:
+                    return this.renderSimpleField(elem);
                 case DomType.Table:
                     return this.renderTable(elem);
                 case DomType.Row:
@@ -3662,16 +3670,74 @@ section.${c}>footer { z-index: 1; }
             return this.h({ tagName: "span", id: elem.name });
         }
         renderRun(elem) {
-            if (elem.fieldRun)
+            if (elem.fieldRun) {
+                this.processFieldRun(elem);
                 return null;
-            let children = this.renderElements(elem.children);
-            if (elem.verticalAlign) {
-                children = [this.h({ tagName: elem.verticalAlign, children: this.renderElements(elem.children) })];
+            }
+            const fieldReplacement = this.computeActiveFieldReplacement();
+            let children;
+            if (fieldReplacement !== null) {
+                children = [document.createTextNode(fieldReplacement)];
+            }
+            else {
+                children = this.renderElements(elem.children);
+                if (elem.verticalAlign) {
+                    children = [this.h({ tagName: elem.verticalAlign, children })];
+                }
             }
             const result = this.toHTML(elem, ns.html, "span", children);
             if (elem.id)
                 result.id = elem.id;
             return result;
+        }
+        processFieldRun(elem) {
+            for (const child of (elem.children ?? [])) {
+                if (child.type === DomType.ComplexField) {
+                    const cf = child;
+                    if (cf.charType === 'begin') {
+                        this.fieldStack.push({ instruction: '', inValue: false });
+                    }
+                    else if (cf.charType === 'separate') {
+                        if (this.fieldStack.length > 0) {
+                            this.fieldStack[this.fieldStack.length - 1].inValue = true;
+                        }
+                    }
+                    else if (cf.charType === 'end') {
+                        this.fieldStack.pop();
+                    }
+                }
+                else if (child.type === DomType.Instruction) {
+                    const it = child;
+                    const top = this.fieldStack[this.fieldStack.length - 1];
+                    if (top && !top.inValue) {
+                        top.instruction += it.text;
+                    }
+                }
+            }
+        }
+        computeActiveFieldReplacement() {
+            for (let i = this.fieldStack.length - 1; i >= 0; i--) {
+                if (this.fieldStack[i].inValue) {
+                    return this.computeFieldValue(this.fieldStack[i].instruction);
+                }
+            }
+            return null;
+        }
+        computeFieldValue(instruction) {
+            const instr = instruction.trim().toUpperCase();
+            if (/^PAGE(\b|$)/.test(instr))
+                return String(this.currentPageNumber);
+            if (/^NUMPAGES(\b|$)/.test(instr))
+                return String(this.totalPages);
+            return null;
+        }
+        renderSimpleField(elem) {
+            const replacement = this.computeFieldValue(elem.instruction ?? '');
+            if (replacement !== null) {
+                return document.createTextNode(replacement);
+            }
+            const children = this.renderElements(elem.children);
+            return children?.length ? this.h({ tagName: "span", children }) : null;
         }
         renderTable(elem) {
             this.tableCellPositions.push(this.currentCellPosition);
