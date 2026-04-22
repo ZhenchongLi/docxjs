@@ -403,9 +403,13 @@
         footer: "36pt",
         gutter: "0pt",
     };
+    function defaultSectionProperties() {
+        return {
+            pageMargins: { ...DEFAULT_PAGE_MARGINS },
+        };
+    }
     function parseSectionProperties(elem, xml = globalXmlParser) {
-        var section = {};
-        section.pageMargins = { ...DEFAULT_PAGE_MARGINS };
+        var section = defaultSectionProperties();
         for (let e of xml.elements(elem)) {
             switch (e.localName) {
                 case "pgSz":
@@ -1466,7 +1470,7 @@
             return {
                 type: DomType.Document,
                 children: this.parseBodyElements(xbody),
-                props: sectPr ? parseSectionProperties(sectPr, globalXmlParser) : {},
+                props: sectPr ? parseSectionProperties(sectPr, globalXmlParser) : defaultSectionProperties(),
                 cssStyle: background ? this.parseBackground(background) : {},
             };
         }

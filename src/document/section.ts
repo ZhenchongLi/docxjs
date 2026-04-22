@@ -77,9 +77,14 @@ const DEFAULT_PAGE_MARGINS: PageMargins = {
     gutter: "0pt",
 };
 
+export function defaultSectionProperties(): SectionProperties {
+    return {
+        pageMargins: { ...DEFAULT_PAGE_MARGINS },
+    } as SectionProperties;
+}
+
 export function parseSectionProperties(elem: Element, xml: XmlParser = globalXmlParser): SectionProperties {
-    var section = <SectionProperties>{};
-    section.pageMargins = { ...DEFAULT_PAGE_MARGINS };
+    var section = defaultSectionProperties();
 
     for (let e of xml.elements(elem)) {
         switch (e.localName) {
