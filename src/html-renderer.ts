@@ -22,6 +22,7 @@ import { BaseHeaderFooterPart } from './header-footer/parts';
 import { Part } from './common/part';
 import { VmlElement } from './vml/vml';
 import { WmlComment, WmlCommentRangeStart, WmlCommentReference } from './comments/elements';
+import { WmlFieldChar, WmlFieldSimple, WmlInstructionText } from './document/fields';
 import { cx, h, ns } from './html';
 
 interface CellPos {
@@ -58,6 +59,10 @@ export class HtmlRenderer {
 	currentFootnoteIds: string[];
 	currentEndnoteIds: string[] = [];
 	usedHederFooterParts: any[] = [];
+
+	currentPageNumber: number = 0;
+	totalPages: number = 0;
+	private fieldStack: { instruction: string; inValue: boolean }[] = [];
 
 	defaultTabSize: string;
 	currentTabs: any[] = [];
@@ -329,8 +334,12 @@ export class HtmlRenderer {
 		const pages = this.groupByPageBreaks(sections);
 		let prevProps = null;
 
-		for (let i = 0, l = pages.length; i < l; i++) {			
+		this.totalPages = pages.length;
+
+		for (let i = 0, l = pages.length; i < l; i++) {
 			this.currentFootnoteIds = [];
+			this.currentPageNumber = i + 1;
+			this.fieldStack = [];
 
 			const section = pages[i][0];
 			let props = section.sectProps;
@@ -736,6 +745,9 @@ section.${c}>footer { z-index: 1; }
 			case DomType.Run:
 				return this.renderRun(elem as WmlRun);
 
+			case DomType.SimpleField:
+				return this.renderSimpleField(elem as WmlFieldSimple);
+
 			case DomType.Table:
 				return this.renderTable(elem);
 
@@ -1097,13 +1109,21 @@ section.${c}>footer { z-index: 1; }
 	}
 
 	renderRun(elem: WmlRun) {
-		if (elem.fieldRun)
+		if (elem.fieldRun) {
+			this.processFieldRun(elem);
 			return null;
+		}
 
-		let children = this.renderElements(elem.children);
+		const fieldReplacement = this.computeActiveFieldReplacement();
+		let children: any[];
 
-		if (elem.verticalAlign) {
-			children = [this.h({ tagName: elem.verticalAlign, children: this.renderElements(elem.children) })];
+		if (fieldReplacement !== null) {
+			children = [document.createTextNode(fieldReplacement)];
+		} else {
+			children = this.renderElements(elem.children);
+			if (elem.verticalAlign) {
+				children = [this.h({ tagName: elem.verticalAlign, children })];
+			}
 		}
 
 		const result = this.toHTML(elem, ns.html, "span", children);
@@ -1112,6 +1132,54 @@ section.${c}>footer { z-index: 1; }
 			result.id = elem.id;
 
 		return result;
+	}
+
+	private processFieldRun(elem: WmlRun) {
+		for (const child of (elem.children ?? [])) {
+			if (child.type === DomType.ComplexField) {
+				const cf = child as WmlFieldChar;
+				if (cf.charType === 'begin') {
+					this.fieldStack.push({ instruction: '', inValue: false });
+				} else if (cf.charType === 'separate') {
+					if (this.fieldStack.length > 0) {
+						this.fieldStack[this.fieldStack.length - 1].inValue = true;
+					}
+				} else if (cf.charType === 'end') {
+					this.fieldStack.pop();
+				}
+			} else if (child.type === DomType.Instruction) {
+				const it = child as WmlInstructionText;
+				const top = this.fieldStack[this.fieldStack.length - 1];
+				if (top && !top.inValue) {
+					top.instruction += it.text;
+				}
+			}
+		}
+	}
+
+	private computeActiveFieldReplacement(): string | null {
+		for (let i = this.fieldStack.length - 1; i >= 0; i--) {
+			if (this.fieldStack[i].inValue) {
+				return this.computeFieldValue(this.fieldStack[i].instruction);
+			}
+		}
+		return null;
+	}
+
+	private computeFieldValue(instruction: string): string | null {
+		const instr = instruction.trim().toUpperCase();
+		if (/^PAGE(\b|$)/.test(instr)) return String(this.currentPageNumber);
+		if (/^NUMPAGES(\b|$)/.test(instr)) return String(this.totalPages);
+		return null;
+	}
+
+	renderSimpleField(elem: WmlFieldSimple) {
+		const replacement = this.computeFieldValue(elem.instruction ?? '');
+		if (replacement !== null) {
+			return document.createTextNode(replacement);
+		}
+		const children = this.renderElements(elem.children);
+		return children?.length ? this.h({ tagName: "span", children }) : null;
 	}
 
 	renderTable(elem: WmlTable) {
