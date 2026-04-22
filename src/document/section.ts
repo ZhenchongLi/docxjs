@@ -65,8 +65,21 @@ export interface SectionProperties {
     titlePage: boolean;
 }
 
+// Word application defaults when <w:pgMar> is absent (e.g. Pandoc-generated docx).
+// 1 inch top/bottom/left/right, 0.5 inch header/footer, 0 gutter.
+const DEFAULT_PAGE_MARGINS: PageMargins = {
+    top: "72pt",
+    right: "72pt",
+    bottom: "72pt",
+    left: "72pt",
+    header: "36pt",
+    footer: "36pt",
+    gutter: "0pt",
+};
+
 export function parseSectionProperties(elem: Element, xml: XmlParser = globalXmlParser): SectionProperties {
     var section = <SectionProperties>{};
+    section.pageMargins = { ...DEFAULT_PAGE_MARGINS };
 
     for (let e of xml.elements(elem)) {
         switch (e.localName) {

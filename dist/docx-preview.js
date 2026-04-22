@@ -394,8 +394,18 @@
         SectionType["EvenPage"] = "evenPage";
         SectionType["OddPage"] = "oddPage";
     })(SectionType || (SectionType = {}));
+    const DEFAULT_PAGE_MARGINS = {
+        top: "72pt",
+        right: "72pt",
+        bottom: "72pt",
+        left: "72pt",
+        header: "36pt",
+        footer: "36pt",
+        gutter: "0pt",
+    };
     function parseSectionProperties(elem, xml = globalXmlParser) {
         var section = {};
+        section.pageMargins = { ...DEFAULT_PAGE_MARGINS };
         for (let e of xml.elements(elem)) {
             switch (e.localName) {
                 case "pgSz":
