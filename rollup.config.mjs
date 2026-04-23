@@ -33,7 +33,7 @@ export default args => {
 			{
 				...umdOutput,
 				file: 'dist/docx-preview.min.js',
-				plugins: [terser()]
+				plugins: [terser({ecma: 2020, compress: {ecma: 2020}, mangle: true})]
 			},
 			{
 				...output,
@@ -44,7 +44,7 @@ export default args => {
 				...output,
 				file: 'dist/docx-preview.min.mjs',
 				format: 'es',
-				plugins: [terser()]
+				plugins: [terser({ecma: 2020, compress: {ecma: 2020}, mangle: true})]
 			}];
 
 	return config

@@ -3476,7 +3476,7 @@ section.${c}>footer { z-index: 1; }
                 case DomType.MmlFraction:
                     return this.renderContainerNS(elem, ns.mathML, "mfrac");
                 case DomType.MmlBase:
-                    return this.renderContainerNS(elem, ns.mathML, elem.parent.type == DomType.MmlMatrixRow ? "mtd" : "mrow");
+                    return this.renderContainerNS(elem, ns.mathML, elem.parent?.type == DomType.MmlMatrixRow ? "mtd" : "mrow");
                 case DomType.MmlNumerator:
                 case DomType.MmlDenominator:
                 case DomType.MmlFunction:
